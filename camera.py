@@ -11,9 +11,9 @@ class Camera:
     label_map = ["background", "aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow",
             "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train", "tvmonitor"]
 
-    def __init__(self, device_info: dai.DeviceInfo, friendly_id: int, show_video: bool = False):
+    def __init__(self, device_info: dai.DeviceInfo, friendly_id: int, show_video: bool = True):
         self.show_video = show_video
-        self.show_depth = False
+        self.show_detph = False
         self.device_info = device_info
         self.friendly_id = friendly_id
         self.mxid = device_info.getMxId()
@@ -30,10 +30,9 @@ class Camera:
         self.window_name = f"[{self.friendly_id}] Camera - mxid: {self.mxid}"
         if show_video:
             cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
-            cv2.resizeWindow(self.window_name, 640, 360)
+            cv2.resizeWindow(self.window_name, 1920, 1080)
 
         self.frame_rgb = None
-        self.frame_depth = None
         self.detected_objects: List[Detection] = []
 
         self._load_calibration()
@@ -79,7 +78,7 @@ class Camera:
         mono_right.setBoardSocket(dai.CameraBoardSocket.RIGHT)
         cam_stereo = pipeline.create(dai.node.StereoDepth)
         cam_stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
-        cam_stereo.setDepthAlign(dai.CameraBoardSocket.RGB) # Align depth map to the perspective of RGB camera, on which inference is done
+        cam_stereo.setDepthAlign(dai.CameraBoardSocket.RGB)
         cam_stereo.setOutputSize(mono_left.getResolutionWidth(), mono_left.getResolutionHeight())
         mono_left.out.link(cam_stereo.left)
         mono_right.out.link(cam_stereo.right)
@@ -126,20 +125,28 @@ class Camera:
         in_nn = self.nn_queue.tryGet()
         in_depth = self.depth_queue.tryGet()
         in_rgb_high_pixel = self.rgb_high_pixel_queue.tryGet()
+        # if in_rgb_high_pixel:
+        #     high_res_frame = in_rgb_high_pixel.getCvFrame()
+        #     cv2.imshow(f"video", high_res_frame)
+        #
+        # cv2.namedWindow("video", cv2.WINDOW_NORMAL)
+        # cv2.resizeWindow("video", 1920, 1080)
 
-        if in_rgb is None or in_depth is None:
+        if in_rgb_high_pixel is None or in_depth is None:
             return
 
         depth_frame = in_depth.getFrame() # depthFrame values are in millimeters
         depth_frame_color = cv2.normalize(depth_frame, None, 255, 0, cv2.NORM_INF, cv2.CV_8UC1)
         depth_frame_color = cv2.equalizeHist(depth_frame_color)
         depth_frame_color = cv2.applyColorMap(depth_frame_color, cv2.COLORMAP_HOT)
+        high_res_frame = in_rgb_high_pixel.getCvFrame()
+        # self.frame_rgb = in_rgb.getCvFrame()
 
-        #self.frame_rgb = in_rgb.getCvFrame()
-        self.frame_rgb = in_rgb_high_pixel.getCvFrame()
-
-        visualization = self.frame_depth if self.show_depth else self.frame_rgb
-        visualization = cv2.resize(visualization, (1920, 1080), interpolation=cv2.INTER_NEAREST)
+        if self.show_detph:
+            visualization = depth_frame_color.copy()
+        else:
+            visualization = high_res_frame.copy()
+        visualization = cv2.resize(visualization, (1920, 1080), interpolation = cv2.INTER_NEAREST)
 
         height = visualization.shape[0]
         width  = visualization.shape[1]
@@ -185,7 +192,6 @@ class Camera:
             cv2.putText(visualization, f"Y: {int(detection.spatialCoordinates.y)} mm", (x1 + 10, y1 + 65), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
             cv2.putText(visualization, f"Z: {int(detection.spatialCoordinates.z)} mm", (x1 + 10, y1 + 80), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
 
-        self.frame_rgb = visualization
 
         if self.show_video:
             cv2.imshow(self.window_name, visualization)

@@ -125,6 +125,5 @@ class BirdsEyeView:
         self.history.append(groups)
         self.draw_groups(groups)
 
-        #cv2.imshow("Bird's Eye View", self.img)
-        return self.img
+        cv2.imshow("Bird's Eye View", self.img)
         
