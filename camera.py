@@ -63,7 +63,7 @@ class Camera:
         try:
             self.tcp_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.tcp_server.bind((host, port))
-            self.tcp_server.listen(1)
+            self.tcp_server.listen()
             print(f"[{self.friendly_id}] TCP Server started at {host}:{port}")
 
             while self.is_server_running:
