@@ -25,6 +25,7 @@ class Camera:
         self.control_queue = self.device.getInputQueue(name="control")
         self.nn_queue = self.device.getOutputQueue(name="nn", maxSize=1, blocking=False)
         self.depth_queue = self.device.getOutputQueue(name="depth", maxSize=1, blocking=False)
+        self.rgb_high_pixel_queue = self.device.getOutputQueue(name="rgb_high_pixel", maxSize=1, blocking=False)
 
         self.window_name = f"[{self.friendly_id}] Camera - mxid: {self.mxid}"
         if show_video:
