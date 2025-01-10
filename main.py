@@ -10,7 +10,6 @@ if len(device_infos) == 0:
     raise RuntimeError("No devices found!")
 else:
     print("Found", len(device_infos), "devices")
-
 device_infos.sort(key=lambda x: x.getMxId(), reverse=True) # sort the cameras by their mxId
 
 cameras: List[Camera] = []
