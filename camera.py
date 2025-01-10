@@ -125,7 +125,7 @@ class Camera:
         in_rgb = self.rgb_queue.tryGet()
         in_nn = self.nn_queue.tryGet()
         in_depth = self.depth_queue.tryGet()
-        in_rgb_high_pixel = self.rgb_high_pixel_queue.tryGet()
+        # in_rgb_high_pixel = self.rgb_high_pixel_queue.tryGet()
 
         if in_rgb is None or in_depth is None:
             return
