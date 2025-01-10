@@ -249,5 +249,5 @@ class Camera:
         # Send frame through TCP if server is enabled
         if self.tcp_server:
             self.tcp_server.send_frame(visualization)
-        if self.show_video:
-            cv2.imshow(self.window_name, visualization)
+        # if self.show_video:
+        #     cv2.imshow(self.window_name, visualization)
