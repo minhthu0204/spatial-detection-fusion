@@ -11,7 +11,7 @@ import config
 
 
 class VideoServer:
-    def __init__(self, host='0.0.0.0', port=9999):
+    def __init__(self, host='192.168.1.7', port=9999):
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.bind((host, port))
         self.server_socket.listen(5)
