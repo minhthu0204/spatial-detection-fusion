@@ -6,6 +6,8 @@ from typing import List
 from detection import Detection
 import config
 import os
+import socket
+import threading
 
 class Camera:
     label_map = ["background", "aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow",
@@ -36,11 +38,49 @@ class Camera:
 
         self._load_calibration()
 
+
+        # Tạo server TCP
+        self.tcp_server = None
+        self.client_socket = None
+        self.is_server_running = True
+        threading.Thread(target=self._start_tcp_server, daemon=True).start()
+
         print("=== Connected to " + self.device_info.getMxId())
 
     def __del__(self):
         self.device.close()
+        self.is_server_running = False
+        if self.client_socket:
+            self.client_socket.close()
+        if self.tcp_server:
+            self.tcp_server.close()
         print("=== Closed " + self.device_info.getMxId())
+
+    def _start_tcp_server(self, host='0.0.0.0', port=8000):
+        """
+        Khởi tạo TCP server để gửi hình ảnh visualization cho client
+        """
+        try:
+            self.tcp_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.tcp_server.bind((host, port))
+            self.tcp_server.listen(1)
+            print(f"[{self.friendly_id}] TCP Server started at {host}:{port}")
+
+            while self.is_server_running:
+                self.client_socket, addr = self.tcp_server.accept()
+                print(f"[{self.friendly_id}] Client connected: {addr}")
+                while self.client_socket:
+                    if self.frame_rgb is not None:
+                        # Mã hóa hình ảnh
+                        _, buffer = cv2.imencode('.jpg', self.frame_rgb)
+                        # Gửi kích thước dữ liệu trước
+                        self.client_socket.sendall(len(buffer).to_bytes(4, 'big'))
+                        # Gửi dữ liệu hình ảnh
+                        self.client_socket.sendall(buffer.tobytes())
+        except Exception as e:
+            print(f"[{self.friendly_id}] TCP Server error: {e}")
+
+
 
     def _load_calibration(self):
         path = os.path.join(os.path.dirname(__file__), f"{config.calibration_data_dir}")
@@ -182,3 +222,14 @@ class Camera:
 
         if self.show_video:
             cv2.imshow(self.window_name, visualization)
+
+        # Gửi dữ liệu visualization qua TCP nếu client đang kết nối
+        if self.client_socket:
+            try:
+                _, buffer = cv2.imencode('.jpg', visualization)
+                self.client_socket.sendall(len(buffer).to_bytes(4, 'big'))
+                self.client_socket.sendall(buffer.tobytes())
+            except Exception as e:
+                print(f"[{self.friendly_id}] Error sending data: {e}")
+                self.client_socket.close()
+                self.client_socket = None
