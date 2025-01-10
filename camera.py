@@ -14,7 +14,7 @@ import threading
 
 
 class CameraTCPServer:
-    def __init__(self, host: str = 'localhost', port: int = 8485):
+    def __init__(self, host: str = '192.168.1.7', port: int = 8485):
         self.host = host
         self.port = port
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
