@@ -56,7 +56,7 @@ class Camera:
             self.tcp_server.close()
         print("=== Closed " + self.device_info.getMxId())
 
-    def _start_tcp_server(self, host='0.0.0.0', port=8000):
+    def _start_tcp_server(self, host='192.168.1.7', port=8000):
         """
         Khởi tạo TCP server để gửi hình ảnh visualization cho client
         """
