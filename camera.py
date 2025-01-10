@@ -6,20 +6,16 @@ from typing import List
 from detection import Detection
 import config
 import os
-import socket
-import struct
 
 class Camera:
     label_map = ["background", "aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow",
             "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train", "tvmonitor"]
 
-    def __init__(self, device_info: dai.DeviceInfo, friendly_id: int, show_video: bool = True, server_ip="127.0.0.1", server_port=65432):
+    def __init__(self, device_info: dai.DeviceInfo, friendly_id: int, show_video: bool = True):
         self.show_video = show_video
         self.show_detph = False
         self.device_info = device_info
         self.friendly_id = friendly_id
-        self.server_ip = server_ip
-        self.server_port = server_port
         self.mxid = device_info.getMxId()
         self._create_pipeline()
         self.device = dai.Device(self.pipeline, self.device_info)
@@ -39,13 +35,6 @@ class Camera:
         self.detected_objects: List[Detection] = []
 
         self._load_calibration()
-        # Initialize TCP server for sending frames
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.bind((self.server_ip, self.server_port))
-        self.server_socket.listen(1)
-        print(f"=== Waiting for client to connect on {self.server_ip}:{self.server_port}...")
-        self.client_socket, self.client_address = self.server_socket.accept()
-        print(f"=== Client connected from {self.client_address}")
 
         print("=== Connected to " + self.device_info.getMxId())
 
@@ -145,15 +134,6 @@ class Camera:
         else:
             visualization = self.frame_rgb.copy()
         visualization = cv2.resize(visualization, (640, 360), interpolation = cv2.INTER_NEAREST)
-
-        # Convert frame to bytes
-        _, buffer = cv2.imencode('.jpg', visualization)
-        frame_bytes = buffer.tobytes()
-
-        # Send the frame size first
-        frame_size = len(frame_bytes)
-        self.client_socket.sendall(struct.pack("L", frame_size))  # Send the frame size as an unsigned long
-        self.client_socket.sendall(frame_bytes)  # Send the actual frame data
 
         height = visualization.shape[0]
         width  = visualization.shape[1]

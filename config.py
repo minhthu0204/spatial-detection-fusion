@@ -2,5 +2,5 @@
 calibration_data_dir = '../multi-cam-calibration/calibration_data' # directory relative to main.py
 
 # bird's-eye view
-size = (1920, 1080)
+size = (640, 360)
 scale = 100 # px/m
