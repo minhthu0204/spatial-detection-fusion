@@ -7,14 +7,13 @@ from detection import Detection
 import config
 import os
 import socket
-import pickle
-import threading
+from threading import Thread
 
 class Camera:
     label_map = ["background", "aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow",
             "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train", "tvmonitor"]
 
-    def __init__(self, device_info: dai.DeviceInfo, friendly_id: int, show_video: bool = True):
+    def __init__(self, device_info: dai.DeviceInfo, friendly_id: int, show_video: bool = True, tcp_port: int = 12345):
         self.show_video = show_video
         self.show_detph = False
         self.device_info = device_info
@@ -39,17 +38,19 @@ class Camera:
 
         self._load_calibration()
 
-        # TCP server setup
-        self.host = "192.168.1.100"
-        self.port = 5000
-        self.server_socket = None
+        # Initialize TCP server
+        self.tcp_port = tcp_port
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.bind(("192.168.1.7", tcp_port))
+        self.server_socket.listen(1)
         self.client_socket = None
-
-        # Start the server in a separate thread
-        self.server_thread = threading.Thread(target=self.start_tcp_server)
+        self.client_address = None
+        self.server_thread = Thread(target=self._accept_client)
+        self.server_thread.daemon = True
         self.server_thread.start()
 
-        print("=== Connected to " + self.device_info.getMxId())
+        print(f"=== Connected to {self.device_info.getMxId()}")
+        print(f"=== TCP Server listening on port {tcp_port}")
 
     def __del__(self):
         self.device.close()
@@ -127,43 +128,23 @@ class Camera:
 
         self.pipeline = pipeline
 
-    def start_tcp_server(self):
-        """TCP server nhận và gửi dữ liệu."""
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.bind((self.host, self.port))
-        self.server_socket.listen(5)
-        print(f"Server listening on {self.host}:{self.port}...")
-
-        # Chấp nhận kết nối từ client
-        self.client_socket, client_address = self.server_socket.accept()
-        print(f"Connection from {client_address} has been established.")
-
+    def _accept_client(self):
         while True:
-            if self.client_socket:
-                data = self.receive_data()
-                if data is None:
-                    continue
-                # Gửi dữ liệu hình ảnh visualization đến client
-                self.send_data(data)
+            print("Waiting for a client to connect...")
+            self.client_socket, self.client_address = self.server_socket.accept()
+            print(f"Client connected: {self.client_address}")
 
-    def receive_data(self):
-        """Nhận dữ liệu từ client."""
-        try:
-            data = self.client_socket.recv(4096)
-            if not data:
-                return None
-            return pickle.loads(data)  # Giải mã dữ liệu hình ảnh
-        except Exception as e:
-            print(f"Error receiving data: {e}")
-            return None
-
-    def send_data(self, data):
-        """Gửi dữ liệu (hình ảnh) về client."""
-        try:
-            img_data = pickle.dumps(data)  # Chuyển đổi ảnh thành byte stream
-            self.client_socket.sendall(img_data)  # Gửi dữ liệu ảnh cho client
-        except Exception as e:
-            print(f"Error sending data: {e}")
+    def _send_frame(self, frame):
+        if self.client_socket:
+            try:
+                _, buffer = cv2.imencode('.jpg', frame)
+                data = buffer.tobytes()
+                size = len(data)
+                self.client_socket.sendall(size.to_bytes(4, 'big') + data)
+            except Exception as e:
+                print(f"Error sending frame: {e}")
+                self.client_socket.close()
+                self.client_socket = None
 
     def update(self):
         in_rgb = self.rgb_queue.tryGet()
@@ -185,10 +166,6 @@ class Camera:
         else:
             visualization = self.frame_rgb.copy()
         visualization = cv2.resize(visualization, (640, 360), interpolation = cv2.INTER_NEAREST)
-
-        # Gửi hình ảnh cho client qua TCP
-        if self.client_socket:
-            self.send_data(visualization)
 
         height = visualization.shape[0]
         width  = visualization.shape[1]
@@ -234,6 +211,6 @@ class Camera:
             cv2.putText(visualization, f"Y: {int(detection.spatialCoordinates.y)} mm", (x1 + 10, y1 + 65), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
             cv2.putText(visualization, f"Z: {int(detection.spatialCoordinates.z)} mm", (x1 + 10, y1 + 80), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
 
-
+        self._send_frame(visualization)
         if self.show_video:
             cv2.imshow(self.window_name, visualization)
