@@ -6,6 +6,9 @@ from typing import List
 from detection import Detection
 import config
 import os
+import socket
+import pickle
+import threading
 
 class Camera:
     label_map = ["background", "aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow",
@@ -35,6 +38,16 @@ class Camera:
         self.detected_objects: List[Detection] = []
 
         self._load_calibration()
+
+        # TCP server setup
+        self.host = "192.168.1.100"
+        self.port = 5000
+        self.server_socket = None
+        self.client_socket = None
+
+        # Start the server in a separate thread
+        self.server_thread = threading.Thread(target=self.start_tcp_server)
+        self.server_thread.start()
 
         print("=== Connected to " + self.device_info.getMxId())
 
@@ -114,6 +127,44 @@ class Camera:
 
         self.pipeline = pipeline
 
+    def start_tcp_server(self):
+        """TCP server nhận và gửi dữ liệu."""
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.bind((self.host, self.port))
+        self.server_socket.listen(5)
+        print(f"Server listening on {self.host}:{self.port}...")
+
+        # Chấp nhận kết nối từ client
+        self.client_socket, client_address = self.server_socket.accept()
+        print(f"Connection from {client_address} has been established.")
+
+        while True:
+            if self.client_socket:
+                data = self.receive_data()
+                if data is None:
+                    continue
+                # Gửi dữ liệu hình ảnh visualization đến client
+                self.send_data(data)
+
+    def receive_data(self):
+        """Nhận dữ liệu từ client."""
+        try:
+            data = self.client_socket.recv(4096)
+            if not data:
+                return None
+            return pickle.loads(data)  # Giải mã dữ liệu hình ảnh
+        except Exception as e:
+            print(f"Error receiving data: {e}")
+            return None
+
+    def send_data(self, data):
+        """Gửi dữ liệu (hình ảnh) về client."""
+        try:
+            img_data = pickle.dumps(data)  # Chuyển đổi ảnh thành byte stream
+            self.client_socket.sendall(img_data)  # Gửi dữ liệu ảnh cho client
+        except Exception as e:
+            print(f"Error sending data: {e}")
+
     def update(self):
         in_rgb = self.rgb_queue.tryGet()
         in_nn = self.nn_queue.tryGet()
@@ -134,6 +185,10 @@ class Camera:
         else:
             visualization = self.frame_rgb.copy()
         visualization = cv2.resize(visualization, (640, 360), interpolation = cv2.INTER_NEAREST)
+
+        # Gửi hình ảnh cho client qua TCP
+        if self.client_socket:
+            self.send_data(visualization)
 
         height = visualization.shape[0]
         width  = visualization.shape[1]
