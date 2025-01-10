@@ -7,17 +7,19 @@ from detection import Detection
 import config
 import os
 import socket
-from threading import Thread
+import struct
 
 class Camera:
     label_map = ["background", "aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow",
             "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train", "tvmonitor"]
 
-    def __init__(self, device_info: dai.DeviceInfo, friendly_id: int, show_video: bool = True, tcp_port: int = 12345):
+    def __init__(self, device_info: dai.DeviceInfo, friendly_id: int, show_video: bool = True, server_ip="127.0.0.1", server_port=65432):
         self.show_video = show_video
         self.show_detph = False
         self.device_info = device_info
         self.friendly_id = friendly_id
+        self.server_ip = server_ip
+        self.server_port = server_port
         self.mxid = device_info.getMxId()
         self._create_pipeline()
         self.device = dai.Device(self.pipeline, self.device_info)
@@ -37,20 +39,15 @@ class Camera:
         self.detected_objects: List[Detection] = []
 
         self._load_calibration()
-
-        # Initialize TCP server
-        self.tcp_port = tcp_port
+        # Initialize TCP server for sending frames
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.bind(("192.168.1.7", tcp_port))
+        self.server_socket.bind((self.server_ip, self.server_port))
         self.server_socket.listen(1)
-        self.client_socket = None
-        self.client_address = None
-        self.server_thread = Thread(target=self._accept_client)
-        self.server_thread.daemon = True
-        self.server_thread.start()
+        print(f"=== Waiting for client to connect on {self.server_ip}:{self.server_port}...")
+        self.client_socket, self.client_address = self.server_socket.accept()
+        print(f"=== Client connected from {self.client_address}")
 
-        print(f"=== Connected to {self.device_info.getMxId()}")
-        print(f"=== TCP Server listening on port {tcp_port}")
+        print("=== Connected to " + self.device_info.getMxId())
 
     def __del__(self):
         self.device.close()
@@ -128,24 +125,6 @@ class Camera:
 
         self.pipeline = pipeline
 
-    def _accept_client(self):
-        while True:
-            print("Waiting for a client to connect...")
-            self.client_socket, self.client_address = self.server_socket.accept()
-            print(f"Client connected: {self.client_address}")
-
-    def _send_frame(self, frame):
-        if self.client_socket:
-            try:
-                _, buffer = cv2.imencode('.jpg', frame)
-                data = buffer.tobytes()
-                size = len(data)
-                self.client_socket.sendall(size.to_bytes(4, 'big') + data)
-            except Exception as e:
-                print(f"Error sending frame: {e}")
-                self.client_socket.close()
-                self.client_socket = None
-
     def update(self):
         in_rgb = self.rgb_queue.tryGet()
         in_nn = self.nn_queue.tryGet()
@@ -166,6 +145,15 @@ class Camera:
         else:
             visualization = self.frame_rgb.copy()
         visualization = cv2.resize(visualization, (640, 360), interpolation = cv2.INTER_NEAREST)
+
+        # Convert frame to bytes
+        _, buffer = cv2.imencode('.jpg', visualization)
+        frame_bytes = buffer.tobytes()
+
+        # Send the frame size first
+        frame_size = len(frame_bytes)
+        self.client_socket.sendall(struct.pack("L", frame_size))  # Send the frame size as an unsigned long
+        self.client_socket.sendall(frame_bytes)  # Send the actual frame data
 
         height = visualization.shape[0]
         width  = visualization.shape[1]
@@ -211,6 +199,6 @@ class Camera:
             cv2.putText(visualization, f"Y: {int(detection.spatialCoordinates.y)} mm", (x1 + 10, y1 + 65), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
             cv2.putText(visualization, f"Z: {int(detection.spatialCoordinates.z)} mm", (x1 + 10, y1 + 80), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
 
-        self._send_frame(visualization)
+
         if self.show_video:
             cv2.imshow(self.window_name, visualization)
