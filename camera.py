@@ -64,6 +64,11 @@ class Camera:
         xout_rgb = pipeline.createXLinkOut()
         xout_rgb.setStreamName("rgb")
 
+        # RGB cam -> 'rgb_high_pixel' (high resolution video output)
+        xout_rgb_high_pixel = pipeline.createXLinkOut()
+        xout_rgb_high_pixel.setStreamName("rgb_high_pixel")
+        cam_rgb.video.link(xout_rgb_high_pixel.input)  # Link high-resolution video output
+
         # Depth cam -> 'depth'
         mono_left = pipeline.create(dai.node.MonoCamera)
         mono_right = pipeline.create(dai.node.MonoCamera)
@@ -116,11 +121,12 @@ class Camera:
         self.pipeline = pipeline
 
     def update(self):
-        in_rgb = self.rgb_queue.tryGet()
+        #in_rgb = self.rgb_queue.tryGet()
         in_nn = self.nn_queue.tryGet()
         in_depth = self.depth_queue.tryGet()
+        in_rgb_high_pixel = self.rgb_high_pixel_queue.tryGet()
 
-        if in_rgb is None or in_depth is None:
+        if in_rgb_high_pixel is None or in_depth is None:
             return
 
         depth_frame = in_depth.getFrame() # depthFrame values are in millimeters
@@ -128,7 +134,8 @@ class Camera:
         depth_frame_color = cv2.equalizeHist(depth_frame_color)
         depth_frame_color = cv2.applyColorMap(depth_frame_color, cv2.COLORMAP_HOT)
 
-        self.frame_rgb = in_rgb.getCvFrame()
+        #self.frame_rgb = in_rgb.getCvFrame()
+        self.frame_rgb = in_rgb_high_pixel.getCvFrame()
 
         visualization = self.frame_depth if self.show_depth else self.frame_rgb
         visualization = cv2.resize(visualization, (640, 360), interpolation=cv2.INTER_NEAREST)
