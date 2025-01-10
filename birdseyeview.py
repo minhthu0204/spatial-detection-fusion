@@ -126,4 +126,5 @@ class BirdsEyeView:
         self.draw_groups(groups)
 
         #cv2.imshow("Bird's Eye View", self.img)
+        return self.img
         

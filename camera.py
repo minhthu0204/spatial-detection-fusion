@@ -1,78 +1,19 @@
-from cgitb import enable
-
 import depthai as dai
 import blobconverter
 import cv2
 import numpy as np
-from typing import List, Optional
+from typing import List
 from detection import Detection
 import config
 import os
-import socket
-import pickle
-import threading
-
-
-class CameraTCPServer:
-    def __init__(self, host: str = '192.168.1.7', port: int = 8485):
-        self.host = host
-        self.port = port
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.server_socket.bind((self.host, self.port))
-        self.server_socket.listen(5)
-        self.clients: List[socket.socket] = []
-        self.running = True
-        # Start server thread
-        self.server_thread = threading.Thread(target=self.accept_connections)
-        self.server_thread.daemon = True
-        self.server_thread.start()
-
-    def accept_connections(self):
-        while self.running:
-            try:
-                client_socket, _ = self.server_socket.accept()
-                self.clients.append(client_socket)
-                print(f"New client connected. Total clients: {len(self.clients)}")
-            except:
-                break
-
-    def send_frame(self, frame):
-        # Encode frame
-        _, encoded_frame = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
-        data = pickle.dumps(encoded_frame)
-        message_size = len(data)
-
-        # Remove disconnected clients
-        disconnected = []
-        for client in self.clients:
-            try:
-                # Send message size first
-                client.sendall(message_size.to_bytes(4, byteorder='big'))
-                # Then send the frame data
-                client.sendall(data)
-            except:
-                disconnected.append(client)
-
-        for client in disconnected:
-            self.clients.remove(client)
-            client.close()
-            print(f"Client disconnected. Remaining clients: {len(self.clients)}")
-
-    def cleanup(self):
-        self.running = False
-        for client in self.clients:
-            client.close()
-        self.server_socket.close()
-
 
 class Camera:
     label_map = ["background", "aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow",
             "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train", "tvmonitor"]
 
-    def __init__(self, device_info: dai.DeviceInfo, friendly_id: int, show_video: bool = True, enable_tcp: bool = True):
+    def __init__(self, device_info: dai.DeviceInfo, friendly_id: int, show_video: bool = False):
         self.show_video = show_video
-        self.show_detph = False
+        self.show_depth = False
         self.device_info = device_info
         self.friendly_id = friendly_id
         self.mxid = device_info.getMxId()
@@ -90,20 +31,13 @@ class Camera:
             cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
             cv2.resizeWindow(self.window_name, 640, 360)
 
-        # Initialize TCP server if enabled
-        self.tcp_server: Optional[CameraTCPServer] = None
-        if enable_tcp:
-            self.tcp_server = CameraTCPServer(port=8485 + friendly_id)
-
-
         self.frame_rgb = None
+        self.frame_depth = None
         self.detected_objects: List[Detection] = []
 
         self._load_calibration()
 
         print("=== Connected to " + self.device_info.getMxId())
-        if enable_tcp:
-            print(f"=== TCP server started on port {8485 + friendly_id}")
 
     def __del__(self):
         self.device.close()
@@ -246,8 +180,7 @@ class Camera:
             cv2.putText(visualization, f"Y: {int(detection.spatialCoordinates.y)} mm", (x1 + 10, y1 + 65), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
             cv2.putText(visualization, f"Z: {int(detection.spatialCoordinates.z)} mm", (x1 + 10, y1 + 80), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
 
-        # Send frame through TCP if server is enabled
-        if self.tcp_server:
-            self.tcp_server.send_frame(visualization)
-        # if self.show_video:
-        #     cv2.imshow(self.window_name, visualization)
+        self.frame_rgb = visualization
+
+        if self.show_video:
+            cv2.imshow(self.window_name, visualization)
