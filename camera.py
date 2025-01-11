@@ -25,7 +25,7 @@ class Camera:
         self.control_queue = self.device.getInputQueue(name="control")
         self.nn_queue = self.device.getOutputQueue(name="nn", maxSize=1, blocking=False)
         self.depth_queue = self.device.getOutputQueue(name="depth", maxSize=1, blocking=False)
-        # self.rgb_high_pixel_queue = self.device.getOutputQueue(name="rgb_high_pixel", maxSize=1, blocking=False)
+        #self.rgb_high_pixel_queue = self.device.getOutputQueue(name="rgb_high_pixel", maxSize=1, blocking=False)
 
         self.window_name = f"[{self.friendly_id}] Camera - mxid: {self.mxid}"
         if show_video:
@@ -33,7 +33,6 @@ class Camera:
             cv2.resizeWindow(self.window_name, 640, 360)
 
         self.frame_rgb = None
-
         self.frame_depth = None
         self.detected_objects: List[Detection] = []
 
@@ -127,16 +126,12 @@ class Camera:
         in_rgb = self.rgb_queue.tryGet()
         in_nn = self.nn_queue.tryGet()
         in_depth = self.depth_queue.tryGet()
-        # in_rgb_high_pixel = self.rgb_high_pixel_queue.tryGet()
 
         if in_rgb is None or in_depth is None:
             return None  # Return None explicitly when no new frames
 
         self.frame_rgb = in_rgb.getCvFrame()
         self.depth_frame = in_depth.getFrame()  # depthFrame values are in millimeters
-
-
-
 
         detections = []
         if in_nn is not None:
