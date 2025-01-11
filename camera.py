@@ -135,6 +135,9 @@ class Camera:
         self.frame_rgb = in_rgb.getCvFrame()
         self.depth_frame = in_depth.getFrame()  # depthFrame values are in millimeters
 
+
+        
+
         detections = []
         if in_nn is not None:
             detections = in_nn.detections
