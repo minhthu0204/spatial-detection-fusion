@@ -121,13 +121,14 @@ class Camera:
 
         self.pipeline = pipeline
 
+    # In camera.py
     def update(self):
         in_rgb = self.rgb_queue.tryGet()
         in_nn = self.nn_queue.tryGet()
         in_depth = self.depth_queue.tryGet()
 
         if in_rgb is None or in_depth is None:
-            return
+            return None  # Return None explicitly when no new frames
 
         self.frame_rgb = in_rgb.getCvFrame()
         self.depth_frame = in_depth.getFrame()  # depthFrame values are in millimeters

@@ -17,6 +17,7 @@ class VideoServer:
         self.server_socket.listen(5)
         print(f"Server listening on {host}:{port}")
 
+    # In video_server.py
     def start(self):
         # Initialize cameras
         device_infos = dai.Device.getAllAvailableDevices()
@@ -30,7 +31,6 @@ class VideoServer:
         friendly_id = 0
         for device_info in device_infos:
             friendly_id += 1
-            # Set show_video to False since we don't want local display
             cameras.append(Camera(device_info, friendly_id, show_video=False))
 
         birds_eye_view = BirdsEyeView(cameras, config.size[0], config.size[1], config.scale)
@@ -44,7 +44,7 @@ class VideoServer:
                     # Update all cameras
                     for camera in cameras:
                         camera_data = camera.update()
-                        if camera_data['frame_rgb'] is not None:
+                        if camera_data is not None:  # Check if camera_data exists
                             # Encode camera frame
                             _, frame_data = cv2.imencode('.jpg', camera_data['frame_rgb'])
                             data_to_send = pickle.dumps({
