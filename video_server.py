@@ -43,18 +43,19 @@ class VideoServer:
                 while True:
                     # Update all cameras
                     for camera in cameras:
-                        camera.update()
-                        if camera.frame_rgb is not None:
+                        camera_data = camera.update()
+                        if camera_data['frame_rgb'] is not None:
                             # Encode camera frame
-                            _, frame_data = cv2.imencode('.jpg', camera.frame_rgb)
-                            camera_data = pickle.dumps({
+                            _, frame_data = cv2.imencode('.jpg', camera_data['frame_rgb'])
+                            data_to_send = pickle.dumps({
                                 'type': 'camera',
-                                'id': camera.friendly_id,
-                                'frame': frame_data
+                                'id': camera_data['friendly_id'],
+                                'frame': frame_data,
+                                'detections': camera_data['detections']
                             })
                             # Send camera frame size and data
-                            message_size = struct.pack("L", len(camera_data))
-                            client_socket.sendall(message_size + camera_data)
+                            message_size = struct.pack("L", len(data_to_send))
+                            client_socket.sendall(message_size + data_to_send)
 
                     # Update and send birds eye view
                     birds_eye_view.render()

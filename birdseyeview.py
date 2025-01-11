@@ -62,7 +62,7 @@ class BirdsEyeView:
                             closest_det = other_det
                     if closest_det is not None and d < distance_threshold:
                         det.corresponding_detections.append(closest_det)
-                        
+
         # keep only double correspondences
         for camera in self.cameras:
             for det in camera.detected_objects:
@@ -125,6 +125,5 @@ class BirdsEyeView:
         self.history.append(groups)
         self.draw_groups(groups)
 
-        cv2.imshow("Bird's Eye View", self.img)
-        #return self.img
-        
+        #cv2.imshow("Bird's Eye View", self.img)
+        return self.img
