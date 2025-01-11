@@ -138,7 +138,7 @@ class Camera:
 
         detections = []
         if in_nn is not None:
-            detections = in_nn.detections
+            detections = [det for det in in_nn.detections if det.label == 15]
 
         self.detected_objects = []
         detection_info = []
