@@ -128,9 +128,12 @@ class Camera:
         in_depth = self.depth_queue.tryGet()
 
         if in_rgb is None or in_depth is None:
-            return None  # Return None explicitly when no new frames
+            return None
 
+        # Get original frame and resize to 640x360
         self.frame_rgb = in_rgb.getCvFrame()
+        self.frame_rgb = cv2.resize(self.frame_rgb, (640, 360), interpolation=cv2.INTER_NEAREST)
+
         self.depth_frame = in_depth.getFrame()  # depthFrame values are in millimeters
 
         detections = []
@@ -139,6 +142,9 @@ class Camera:
 
         self.detected_objects = []
         detection_info = []
+
+        height = self.frame_rgb.shape[0]
+        width = self.frame_rgb.shape[1]
 
         for detection in detections:
             try:
@@ -154,7 +160,7 @@ class Camera:
 
                 self.detected_objects.append(Detection(label, detection.confidence, pos_world_frame, self.friendly_id))
 
-            # Store detection information for client
+            # Store detection information for client, adjusted for resized frame
             detection_info.append({
                 'label': label,
                 'confidence': detection.confidence,
@@ -175,5 +181,6 @@ class Camera:
             'frame_rgb': self.frame_rgb,
             'depth_frame': self.depth_frame,
             'detections': detection_info,
-            'friendly_id': self.friendly_id
+            'friendly_id': self.friendly_id,
+            'frame_size': (width, height)  # Send frame dimensions to client
         }
