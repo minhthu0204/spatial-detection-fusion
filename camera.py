@@ -133,7 +133,7 @@ class Camera:
 
         #self.frame_rgb = in_rgb.getCvFrame()
         self.frame_rgb = in_rgb_high_pixel.getCvFrame()
-        self.frame_rgb = cv2.resize(self.frame_rgb, (640, 360), interpolation=cv2.INTER_NEAREST)
+        self.frame_rgb = cv2.resize(self.frame_rgb, (1920, 720), interpolation=cv2.INTER_NEAREST)
 
         self.depth_frame = in_depth.getFrame()  # depthFrame values are in millimeters
 
