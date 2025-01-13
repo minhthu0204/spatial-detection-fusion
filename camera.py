@@ -138,7 +138,7 @@ class Camera:
 
         # Get original frame and resize to 640x360
         self.frame_rgb = in_rgb.getCvFrame()
-        self.frame_rgb = cv2.resize(self.frame_rgb, (640, 360), interpolation=cv2.INTER_NEAREST)
+        self.frame_rgb = cv2.resize(self.frame_rgb, (768, 480), interpolation=cv2.INTER_NEAREST)
 
         self.depth_frame = in_depth.getFrame()  # depthFrame values are in millimeters
 
