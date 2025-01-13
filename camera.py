@@ -130,6 +130,12 @@ class Camera:
         if in_rgb is None or in_depth is None:
             return None
 
+        depth_frame = in_depth.getFrame()  # depthFrame values are in millimeters
+        depth_frame_color = cv2.normalize(depth_frame, None, 255, 0, cv2.NORM_INF, cv2.CV_8UC1)
+        depth_frame_color = cv2.equalizeHist(depth_frame_color)
+        depth_frame_color = cv2.applyColorMap(depth_frame_color, cv2.COLORMAP_HOT)
+
+
         # Get original frame and resize to 640x360
         self.frame_rgb = in_rgb.getCvFrame()
         self.frame_rgb = cv2.resize(self.frame_rgb, (640, 360), interpolation=cv2.INTER_NEAREST)
@@ -182,5 +188,6 @@ class Camera:
             'depth_frame': self.depth_frame,
             'detections': detection_info,
             'friendly_id': self.friendly_id,
+            'depth_frame_color': depth_frame_color,  # Thêm dòng này
             'frame_size': (width, height)  # Send frame dimensions to client
         }

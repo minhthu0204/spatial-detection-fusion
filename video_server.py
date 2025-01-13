@@ -47,10 +47,12 @@ class VideoServer:
                         if camera_data is not None:  # Check if camera_data exists
                             # Encode camera frame
                             _, frame_data = cv2.imencode('.jpg', camera_data['frame_rgb'])
+                            _, depth_data = cv2.imencode('.jpg', camera_data['depth_frame_color'])
                             data_to_send = pickle.dumps({
                                 'type': 'camera',
                                 'id': camera_data['friendly_id'],
                                 'frame': frame_data,
+                                'depth_frame': depth_data,  # Thêm dòng này
                                 'detections': camera_data['detections']
                             })
                             # Send camera frame size and data
