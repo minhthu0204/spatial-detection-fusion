@@ -140,9 +140,9 @@ class Camera:
         # self.frame_rgb = in_rgb_high_pixel.getCvFrame()
 
         visualization = self.frame_rgb
-        visualization = cv2.resize(visualization, (640, 360), interpolation=cv2.INTER_NEAREST)
+        visualization = cv2.resize(visualization, (854, 480), interpolation=cv2.INTER_NEAREST)
 
-        depth_visualization = cv2.resize(depth_frame_color, (640, 360), interpolation=cv2.INTER_NEAREST)
+        depth_visualization = cv2.resize(depth_frame_color, (854, 480), interpolation=cv2.INTER_NEAREST)
 
         height = visualization.shape[0]
         width  = visualization.shape[1]
