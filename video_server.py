@@ -9,9 +9,23 @@ from camera import Camera
 from birdseyeview import BirdsEyeView
 import config
 
+def get_local_ip():
+    try:
+        # Tạo một socket giả để xác định địa chỉ IP
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))  # Kết nối đến một IP bất kỳ
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception as e:
+        print(f"Không thể lấy địa chỉ IP: {e}")
+        return "127.0.0.1"  # Dùng localhost nếu không lấy được IP
+
 
 class VideoServer:
-    def __init__(self, host='192.168.1.7', port=9999):
+    def __init__(self, host=None, port=9999):
+        if host is None:
+            host = get_local_ip()  # Lấy IP cục bộ tự động
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.bind((host, port))
         self.server_socket.listen(5)
