@@ -23,7 +23,7 @@ def get_local_ip():
 
 
 class VideoServer:
-    def __init__(self, host=None, port=9999):
+    def __init__(self, host= "192.168.1.23", port=9999):
         if host is None:
             host = get_local_ip()  # Lấy IP cục bộ tự động
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
