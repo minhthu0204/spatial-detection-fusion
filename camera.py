@@ -134,12 +134,15 @@ class Camera:
         depth_frame_color = cv2.normalize(depth_frame, None, 255, 0, cv2.NORM_INF, cv2.CV_8UC1)
         depth_frame_color = cv2.equalizeHist(depth_frame_color)
         depth_frame_color = cv2.applyColorMap(depth_frame_color, cv2.COLORMAP_HOT)
+        self.frame_depth = depth_frame_color
 
         self.frame_rgb = in_rgb.getCvFrame()
         # self.frame_rgb = in_rgb_high_pixel.getCvFrame()
 
-        visualization = self.frame_depth if self.show_depth else self.frame_rgb
+        visualization = self.frame_rgb
         visualization = cv2.resize(visualization, (640, 360), interpolation=cv2.INTER_NEAREST)
+
+        depth_visualization = cv2.resize(depth_frame_color, (640, 360), interpolation=cv2.INTER_NEAREST)
 
         height = visualization.shape[0]
         width  = visualization.shape[1]
@@ -186,6 +189,7 @@ class Camera:
             cv2.putText(visualization, f"Z: {int(detection.spatialCoordinates.z)} mm", (x1 + 10, y1 + 80), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
 
         self.frame_rgb = visualization
+        self.frame_depth = depth_visualization
 
         if self.show_video:
             cv2.imshow(self.window_name, visualization)

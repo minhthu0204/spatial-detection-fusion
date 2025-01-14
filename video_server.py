@@ -47,11 +47,18 @@ class VideoServer:
                         if camera.frame_rgb is not None:
                             # Encode camera frame
                             _, frame_data = cv2.imencode('.jpg', camera.frame_rgb)
+                            # Encode depth frame
+                            if camera.frame_depth is not None:
+                                _, depth_frame_data = cv2.imencode('.jpg', camera.frame_depth)
+                            else:
+                                depth_frame_data = None
                             camera_data = pickle.dumps({
                                 'type': 'camera',
                                 'id': camera.friendly_id,
-                                'frame': frame_data
+                                'frame': frame_data,
+                                'depth_frame': depth_frame_data
                             })
+
                             # Send camera frame size and data
                             message_size = struct.pack("L", len(camera_data))
                             client_socket.sendall(message_size + camera_data)
