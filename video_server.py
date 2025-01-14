@@ -30,7 +30,6 @@ class VideoServer:
         friendly_id = 0
         for device_info in device_infos:
             friendly_id += 1
-            # Set show_video to False since we don't want local display
             cameras.append(Camera(device_info, friendly_id, show_video=False))
 
         birds_eye_view = BirdsEyeView(cameras, config.size[0], config.size[1], config.scale)
@@ -45,16 +44,26 @@ class VideoServer:
                     for camera in cameras:
                         camera.update()
                         if camera.frame_rgb is not None:
-                            # Encode camera frame
+                            # Encode and send RGB frame
                             _, frame_data = cv2.imencode('.jpg', camera.frame_rgb)
                             camera_data = pickle.dumps({
                                 'type': 'camera',
                                 'id': camera.friendly_id,
                                 'frame': frame_data
                             })
-                            # Send camera frame size and data
                             message_size = struct.pack("L", len(camera_data))
                             client_socket.sendall(message_size + camera_data)
+
+                            # Encode and send depth frame
+                            if camera.frame_depth is not None:
+                                _, depth_data = cv2.imencode('.jpg', camera.frame_depth)
+                                depth_frame_data = pickle.dumps({
+                                    'type': 'depth',
+                                    'id': camera.friendly_id,
+                                    'frame': depth_data
+                                })
+                                message_size = struct.pack("L", len(depth_frame_data))
+                                client_socket.sendall(message_size + depth_frame_data)
 
                     # Update and send birds eye view
                     birds_eye_view.render()
