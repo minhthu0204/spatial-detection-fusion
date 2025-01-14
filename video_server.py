@@ -17,7 +17,6 @@ class VideoServer:
         self.server_socket.listen(5)
         print(f"Server listening on {host}:{port}")
 
-    # In video_server.py
     def start(self):
         # Initialize cameras
         device_infos = dai.Device.getAllAvailableDevices()
@@ -31,6 +30,7 @@ class VideoServer:
         friendly_id = 0
         for device_info in device_infos:
             friendly_id += 1
+            # Set show_video to False since we don't want local display
             cameras.append(Camera(device_info, friendly_id, show_video=False))
 
         birds_eye_view = BirdsEyeView(cameras, config.size[0], config.size[1], config.scale)
@@ -43,21 +43,18 @@ class VideoServer:
                 while True:
                     # Update all cameras
                     for camera in cameras:
-                        camera_data = camera.update()
-                        if camera_data is not None:  # Check if camera_data exists
+                        camera.update()
+                        if camera.frame_rgb is not None:
                             # Encode camera frame
-                            _, frame_data = cv2.imencode('.jpg', camera_data['frame_rgb'])
-                            _, depth_data = cv2.imencode('.jpg', camera_data['depth_frame_color'])
-                            data_to_send = pickle.dumps({
+                            _, frame_data = cv2.imencode('.jpg', camera.frame_rgb)
+                            camera_data = pickle.dumps({
                                 'type': 'camera',
-                                'id': camera_data['friendly_id'],
-                                'frame': frame_data,
-                                'depth_frame': depth_data,  # Thêm dòng này
-                                'detections': camera_data['detections']
+                                'id': camera.friendly_id,
+                                'frame': frame_data
                             })
                             # Send camera frame size and data
-                            message_size = struct.pack("L", len(data_to_send))
-                            client_socket.sendall(message_size + data_to_send)
+                            message_size = struct.pack("L", len(camera_data))
+                            client_socket.sendall(message_size + camera_data)
 
                     # Update and send birds eye view
                     birds_eye_view.render()

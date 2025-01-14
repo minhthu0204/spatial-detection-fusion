@@ -121,73 +121,71 @@ class Camera:
 
         self.pipeline = pipeline
 
-    # In camera.py
     def update(self):
         in_rgb = self.rgb_queue.tryGet()
         in_nn = self.nn_queue.tryGet()
         in_depth = self.depth_queue.tryGet()
+        # in_rgb_high_pixel = self.rgb_high_pixel_queue.tryGet()
 
         if in_rgb is None or in_depth is None:
-            return None
+            return
 
-        depth_frame = in_depth.getFrame()  # depthFrame values are in millimeters
+        depth_frame = in_depth.getFrame() # depthFrame values are in millimeters
         depth_frame_color = cv2.normalize(depth_frame, None, 255, 0, cv2.NORM_INF, cv2.CV_8UC1)
         depth_frame_color = cv2.equalizeHist(depth_frame_color)
         depth_frame_color = cv2.applyColorMap(depth_frame_color, cv2.COLORMAP_HOT)
 
-
-        # Get original frame and resize to 640x360
         self.frame_rgb = in_rgb.getCvFrame()
-        self.frame_rgb = cv2.resize(self.frame_rgb, (768, 480), interpolation=cv2.INTER_NEAREST)
+        # self.frame_rgb = in_rgb_high_pixel.getCvFrame()
 
-        self.depth_frame = in_depth.getFrame()  # depthFrame values are in millimeters
+        visualization = self.frame_depth if self.show_depth else self.frame_rgb
+        visualization = cv2.resize(visualization, (640, 360), interpolation=cv2.INTER_NEAREST)
+
+        height = visualization.shape[0]
+        width  = visualization.shape[1]
 
         detections = []
         if in_nn is not None:
-            detections = [det for det in in_nn.detections if det.label == 15]
+            detections = in_nn.detections
 
         self.detected_objects = []
-        detection_info = []
-
-        height = self.frame_rgb.shape[0]
-        width = self.frame_rgb.shape[1]
 
         for detection in detections:
+            roi = detection.boundingBoxMapping.roi
+            roi = roi.denormalize(width, height)
+            top_left = roi.topLeft()
+            bottom_right = roi.bottomRight()
+            xmin = int(top_left.x)
+            ymin = int(top_left.y)
+            xmax = int(bottom_right.x)
+            ymax = int(bottom_right.y)
+
+            x1 = int(detection.xmin * width)
+            x2 = int(detection.xmax * width)
+            y1 = int(detection.ymin * height)
+            y2 = int(detection.ymax * height)
+
             try:
                 label = self.label_map[detection.label]
             except:
                 label = detection.label
 
             if self.cam_to_world is not None:
-                pos_camera_frame = np.array([[detection.spatialCoordinates.x / 1000,
-                                              -detection.spatialCoordinates.y / 1000,
-                                              detection.spatialCoordinates.z / 1000, 1]]).T
+                pos_camera_frame = np.array([[detection.spatialCoordinates.x / 1000, -detection.spatialCoordinates.y / 1000, detection.spatialCoordinates.z / 1000, 1]]).T
+                # pos_camera_frame = np.array([[0, 0, detection.spatialCoordinates.z/1000, 1]]).T
                 pos_world_frame = self.cam_to_world @ pos_camera_frame
 
                 self.detected_objects.append(Detection(label, detection.confidence, pos_world_frame, self.friendly_id))
 
-            # Store detection information for client, adjusted for resized frame
-            detection_info.append({
-                'label': label,
-                'confidence': detection.confidence,
-                'bbox': {
-                    'xmin': detection.xmin,
-                    'ymin': detection.ymin,
-                    'xmax': detection.xmax,
-                    'ymax': detection.ymax
-                },
-                'spatial': {
-                    'x': detection.spatialCoordinates.x,
-                    'y': detection.spatialCoordinates.y,
-                    'z': detection.spatialCoordinates.z
-                }
-            })
+            cv2.rectangle(visualization, (xmin, ymin), (xmax, ymax), (100, 0, 0), 2)
+            cv2.rectangle(visualization, (x1, y1), (x2, y2), (255, 0, 0), 2)
+            cv2.putText(visualization, str(label), (x1 + 10, y1 + 20), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+            cv2.putText(visualization, "{:.2f}".format(detection.confidence*100), (x1 + 10, y1 + 35), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+            cv2.putText(visualization, f"X: {int(detection.spatialCoordinates.x)} mm", (x1 + 10, y1 + 50), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+            cv2.putText(visualization, f"Y: {int(detection.spatialCoordinates.y)} mm", (x1 + 10, y1 + 65), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
+            cv2.putText(visualization, f"Z: {int(detection.spatialCoordinates.z)} mm", (x1 + 10, y1 + 80), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
 
-        return {
-            'frame_rgb': self.frame_rgb,
-            'depth_frame': self.depth_frame,
-            'detections': detection_info,
-            'friendly_id': self.friendly_id,
-            'depth_frame_color': depth_frame_color,  # Thêm dòng này
-            'frame_size': (width, height)  # Send frame dimensions to client
-        }
+        self.frame_rgb = visualization
+
+        if self.show_video:
+            cv2.imshow(self.window_name, visualization)
