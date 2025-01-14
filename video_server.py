@@ -9,20 +9,13 @@ from camera import Camera
 from birdseyeview import BirdsEyeView
 import config
 
+
 class VideoServer:
     def __init__(self, host='192.168.1.7', port=9999):
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.bind((host, port))
         self.server_socket.listen(5)
         print(f"Server listening on {host}:{port}")
-
-    def send_frame(self, client_socket, frame_data):
-        try:
-            message_size = struct.pack("L", len(frame_data))
-            client_socket.sendall(message_size + frame_data)
-        except Exception as e:
-            print(f"Error sending frame: {e}")
-            raise
 
     def start(self):
         # Initialize cameras
@@ -37,6 +30,7 @@ class VideoServer:
         friendly_id = 0
         for device_info in device_infos:
             friendly_id += 1
+            # Set show_video to False since we don't want local display
             cameras.append(Camera(device_info, friendly_id, show_video=False))
 
         birds_eye_view = BirdsEyeView(cameras, config.size[0], config.size[1], config.scale)
@@ -51,49 +45,31 @@ class VideoServer:
                     for camera in cameras:
                         camera.update()
                         if camera.frame_rgb is not None:
-                            try:
-                                # Send RGB frame
-                                _, frame_data = cv2.imencode('.jpg', camera.frame_rgb)
-                                camera_data = pickle.dumps({
-                                    'type': 'camera',
-                                    'id': camera.friendly_id,
-                                    'frame': frame_data
-                                })
-                                self.send_frame(client_socket, camera_data)
-
-                                # Send depth frame if available
-                                if camera.frame_depth is not None:
-                                    _, depth_data = cv2.imencode('.jpg', camera.frame_depth)
-                                    depth_frame_data = pickle.dumps({
-                                        'type': 'camera',
-                                        'id': camera.friendly_id,
-                                        'frame': depth_data,
-                                        'depth_frame': depth_data
-                                    })
-                                    self.send_frame(client_socket, depth_frame_data)
-
-                            except Exception as e:
-                                print(f"Error processing camera {camera.friendly_id}: {e}")
-                                continue
+                            # Encode camera frame
+                            _, frame_data = cv2.imencode('.jpg', camera.frame_rgb)
+                            camera_data = pickle.dumps({
+                                'type': 'camera',
+                                'id': camera.friendly_id,
+                                'frame': frame_data
+                            })
+                            # Send camera frame size and data
+                            message_size = struct.pack("L", len(camera_data))
+                            client_socket.sendall(message_size + camera_data)
 
                     # Update and send birds eye view
-                    try:
-                        birds_eye_view.render()
-                        _, birds_eye_data = cv2.imencode('.jpg', birds_eye_view.img)
-                        view_data = pickle.dumps({
-                            'type': 'birds_eye',
-                            'frame': birds_eye_data
-                        })
-                        self.send_frame(client_socket, view_data)
+                    birds_eye_view.render()
+                    _, birds_eye_data = cv2.imencode('.jpg', birds_eye_view.img)
+                    view_data = pickle.dumps({
+                        'type': 'birds_eye',
+                        'frame': birds_eye_data
+                    })
+                    message_size = struct.pack("L", len(view_data))
+                    client_socket.sendall(message_size + view_data)
 
-                    except Exception as e:
-                        print(f"Error processing birds eye view: {e}")
-                        continue
-
-            except (ConnectionResetError, BrokenPipeError) as e:
-                print(f"Client {addr} disconnected: {e}")
+            except (ConnectionResetError, BrokenPipeError):
+                print(f"Client {addr} disconnected")
                 client_socket.close()
-                break
+
 
 if __name__ == "__main__":
     server = VideoServer()
